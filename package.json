@@ -3,7 +3,8 @@
   "main": "lib/index.js",
   "version": "1.0.0",
   "files": [
-    "lib"
+    "lib",
+    "common.js"
   ],
   "scripts": {
     "dev": "tsc --watch"

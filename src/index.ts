@@ -21,23 +21,28 @@ const getFileNameFromPath = p => p.replace(/^.*[\\\/]/, '')
 
 const plugins = {
 
+  internal(config: WebpackConfig) {
+    config.resolveLoader.alias
+      .set('page-loader', require.resolve('./pageLoader'))
+  },
+
   babel(config: WebpackConfig) {
     // babel and jsx
     config
       .module.rule('babel')
       .test(/\.m?js$/)
       .exclude
-      .add(/node_modules/)
-      .end()
+        .add(/node_modules/)
+        .end()
       .use('babel')
-      .loader(require.resolve('babel-loader'))
-      .options({
-        presets: [
-          require.resolve('@babel/preset-env'),
-          require.resolve('@babel/preset-react')
-        ]
-      })
-      .end()
+        .loader(require.resolve('babel-loader'))
+        .options({
+          presets: [
+            require.resolve('@babel/preset-env'),
+            require.resolve('@babel/preset-react')
+          ]
+        })
+        .end()
   }
 }
 
@@ -51,9 +56,12 @@ export default {
     const routes = options.routes || []
 
     const clientSideconfig = new WebpackConfig()
+    clientSideconfig.name('client')
     clientSideconfig.mode(isDev ? 'development' : 'production')
+    clientSideconfig.output.libraryExport('commonjs')
 
     const serverSideConfig = new WebpackConfig()
+    serverSideConfig.name('server')
     serverSideConfig.mode(isDev ? 'development' : 'production')
     serverSideConfig.target('node')
     serverSideConfig.output.libraryTarget('commonjs')
@@ -62,6 +70,11 @@ export default {
       'react-dom'
     ])
 
+    plugins.babel(clientSideconfig)
+    plugins.babel(serverSideConfig)
+    plugins.internal(clientSideconfig)
+    plugins.internal(serverSideConfig)
+
 
     await server.register(require('@hapi/inert'))
     server.route({
@@ -69,7 +82,7 @@ export default {
       path: '/static/{param*}',
       handler: {
         directory: {
-          path: resolveApp('.one/client')
+          path: resolveApp(OUTPUT_PATH, './client')
         }
       }
     })
@@ -80,17 +93,14 @@ export default {
 
       clientSideconfig
         .entry(fileName)
-        .add(route.component)
+          // .add(require.resolve('../scripts/client/common.js'))
+          .add(`page-loader!${route.component}`)
         .end()
 
       serverSideConfig
         .entry(fileName)
         .add(route.component)
         .end()
-
-      plugins.babel(clientSideconfig)
-      plugins.babel(serverSideConfig)
-
 
       server.route({
         method: 'GET',
@@ -111,9 +121,7 @@ export default {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
   </head>
     <body>
-      <div id="root">
-              ${elmentString}
-      </div>
+      <div id="root">${elmentString}</div>
 
       <script src="/static/${fileName}.js"></script>
     </body>
@@ -145,7 +153,8 @@ export default {
       if (err) {
         console.log(err)
       } else {
-        console.log(stats?.toJson())
+        console.log('compile success')
+        // console.log(stats?.toString())
       }
     })
   }
